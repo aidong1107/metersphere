@@ -45,5 +45,7 @@ public class Project implements Serializable {
 
     private String azureFilterId;
 
+    private Boolean versionEnable;
+
     private static final long serialVersionUID = 1L;
 }
