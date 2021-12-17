@@ -18,6 +18,12 @@
           <el-link type="primary" style="margin-right: 20px" @click="openHis" v-if="form.id">
             {{ $t('operating_log.change_history') }}
           </el-link>
+          <!--  版本历史 -->
+          <ms-version-history v-xpack
+                              ref="versionHistory"
+                              :version-data="versionData"
+                              :current-id="currentTestCaseInfo.id"
+                              @compare="compare" @checkout="checkout" @create="create" @del="del"/>
           <ms-table-button v-if="this.path!=='/test/case/add'"
                            id="inputDelay"
                            type="primary"
@@ -150,7 +156,7 @@ import {
   getCurrentProjectID,
   getCurrentUser,
   getNodePath, getUUID,
-  handleCtrlSEvent, hasPermission,
+  handleCtrlSEvent, hasLicense, hasPermission,
   listenGoBack,
   removeGoBackListener
 } from "@/common/js/utils";
@@ -181,6 +187,9 @@ import StepChangeItem from "@/business/components/track/case/components/StepChan
 import MsChangeHistory from "../../../history/ChangeHistory";
 import {getTestTemplate} from "@/network/custom-field-template";
 
+const requireComponent = require.context('@/business/components/xpack/', true, /\.vue$/);
+const versionHistory = requireComponent.keys().length > 0 ? requireComponent("./version/VersionHistory.vue") : {};
+
 export default {
   name: "TestCaseEdit",
   components: {
@@ -195,7 +204,8 @@ export default {
     ReviewCommentItem,
     TestCaseComment, MsPreviousNextButton, MsInputTag, CaseComment, MsDialogFooter, TestCaseAttachment,
     MsTestCaseStepRichText,
-    MsChangeHistory
+    MsChangeHistory,
+    'MsVersionHistory': versionHistory.default,
   },
   data() {
     return {
@@ -280,7 +290,8 @@ export default {
         id: 'id',
         label: 'name',
       },
-      tabId: getUUID()
+      tabId: getUUID(),
+      versionData: [],
     };
   },
   props: {
@@ -402,6 +413,9 @@ export default {
         }
       }
     })
+    if (hasLicense()) {
+      this.getVersionHistory();
+    }
   },
   methods: {
     currentUser: () => {
@@ -856,7 +870,7 @@ export default {
 
       } else {
         this.showFollow = true;
-        if(!this.form.follows){
+        if (!this.form.follows) {
           this.form.follows = [];
         }
         this.form.follows.push(this.currentUser().id)
@@ -869,6 +883,47 @@ export default {
           });
         }
       }
+    },
+    getVersionHistory() {
+      this.$get('/test/case/versions/' + this.currentTestCaseInfo.id, response => {
+        this.versionData = response.data;
+      });
+    },
+    compare(row) {
+      // console.log(row);
+    },
+    checkout(row) {
+      this.$refs.versionHistory.loading = true;
+      let testCase = this.versionData.filter(v => v.versionId === row.id)[0];
+
+      if (testCase) {
+        this.$get('test/case/get/' + testCase.id, response => {
+          let testCase = response.data;
+          this.$emit("checkout", testCase);
+        });
+      }
+    },
+    create(row) {
+      // 创建新版本
+      this.form.versionId = row.id;
+      this.saveCase(this.getVersionHistory());
+      this.$refs.versionHistory.loading = false;
+    },
+    del(row) {
+      let that = this;
+      this.$alert(this.$t('api_test.definition.request.delete_confirm') + ' ' + row.name + " ？", '', {
+        confirmButtonText: this.$t('commons.confirm'),
+        callback: (action) => {
+          if (action === 'confirm') {
+            this.$get('/test/case/delete/' + row.id + '/' + this.form.refId, () => {
+              this.$success(this.$t('commons.delete_success'));
+              this.getVersionHistory();
+            });
+          }else{
+            that.$refs.versionHistory.loading = false;
+          }
+        }
+      });
     }
   }
 }

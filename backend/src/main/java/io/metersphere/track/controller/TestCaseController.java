@@ -358,4 +358,19 @@ public class TestCaseController {
     public void editTestFollows(@PathVariable String caseId,@RequestBody List<String> follows) {
         testCaseService.saveFollows(caseId,follows);
     }
+
+    @GetMapping("versions/{caseId}")
+    public List<TestCaseDTO> getTestCaseVersions(@PathVariable String caseId) {
+        return testCaseService.getTestCaseVersions(caseId);
+    }
+
+    @GetMapping("get/{version}/{refId}")
+    public TestCaseDTO getTestCase(@PathVariable String version, @PathVariable String refId) {
+        return testCaseService.getTestCaseByVersion(refId, version);
+    }
+
+    @GetMapping("delete/{version}/{refId}")
+    public void deleteApiDefinition(@PathVariable String version, @PathVariable String refId) {
+        testCaseService.deleteTestCaseByVersion(refId, version);
+    }
 }

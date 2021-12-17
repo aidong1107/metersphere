@@ -46,12 +46,16 @@
             :right-tip="$t('test_track.case.minder')"
             :right-content="$t('test_track.case.minder')"
             :middle-button-enable="false">
+            <template v-slot:version>
+              <version-select v-xpack :project-id="projectId" @changeVersion="changeVersion"/>
+            </template>
             <test-case-list
               v-if="activeDom === 'left'"
               :checkRedirectID="checkRedirectID"
               :isRedirectEdit="isRedirectEdit"
               :tree-nodes="treeNodes"
               :trash-enable="false"
+              :current-version="currentVersion"
               @refreshTable="refresh"
               @testCaseEdit="editTestCase"
               @testCaseCopy="copyTestCase"
@@ -84,6 +88,7 @@
               @refresh="refreshTable"
               @caseEdit="handleCaseCreateOrEdit($event,'edit')"
               @caseCreate="handleCaseCreateOrEdit($event,'add')"
+              @checkout="checkout($event, item)"
               :read-only="testCaseReadOnly"
               :tree-nodes="treeNodes"
               :select-node="selectNode"
@@ -93,6 +98,9 @@
               ref="testCaseEdit">
             </test-case-edit>
           </div>
+          <template v-slot:version>
+            <version-select v-xpack :project-id="projectId" @changeVersion="changeVersion"/>
+          </template>
         </el-tab-pane>
         <el-tab-pane name="add" v-if="hasPermission('PROJECT_TRACK_CASE:READ+CREATE')">
           <template v-slot:label>
@@ -140,6 +148,9 @@ import TestCaseMinder from "@/business/components/track/common/minder/TestCaseMi
 import IsChangeConfirm from "@/business/components/common/components/IsChangeConfirm";
 import {openMinderConfirm, saveMinderConfirm} from "@/business/components/track/common/minder/minderUtils";
 
+const requireComponent = require.context('@/business/components/xpack/', true, /\.vue$/);
+const VersionSelect = requireComponent.keys().length > 0 ? requireComponent("./version/VersionSelect.vue") : {};
+
 export default {
   name: "TestCase",
   components: {
@@ -148,7 +159,8 @@ export default {
     MsTabButton,
     TestCaseNodeTree,
     MsMainContainer,
-    MsAsideContainer, MsContainer, TestCaseList, NodeTree, TestCaseEdit, SelectMenu
+    MsAsideContainer, MsContainer, TestCaseList, NodeTree, TestCaseEdit, SelectMenu,
+    'VersionSelect': VersionSelect.default,
   },
   comments: {},
   data() {
@@ -167,15 +179,16 @@ export default {
       activeDom: 'left',
       tmpActiveDom: null,
       total: 0,
-      tmpPath: null
+      tmpPath: null,
+      currentVersion: null,
     };
   },
   mounted() {
     this.getProject();
     let routeTestCase = this.$route.params.testCase;
-    if(routeTestCase && routeTestCase.add===true){
+    if (routeTestCase && routeTestCase.add === true) {
       this.addTab({name: 'add'});
-    }else {
+    } else {
       this.init(this.$route);
     }
   },
@@ -210,10 +223,10 @@ export default {
         }
       });
     },
-    trashEnable(){
-      if(this.trashEnable){
+    trashEnable() {
+      if (this.trashEnable) {
         this.activeName = 'trash';
-      }else {
+      } else {
         this.activeName = 'default';
       }
     }
@@ -257,8 +270,8 @@ export default {
           break;
       }
     },
-    getTrashList(){
-      this.$get("/case/node/trashCount/"+this.projectId , response => {
+    getTrashList() {
+      this.$get("/case/node/trashCount/" + this.projectId, response => {
         this.total = response.data;
       });
     },
@@ -370,9 +383,9 @@ export default {
           this.$warning(this.$t('commons.check_project_tip'));
           return;
         }
-        if(routeTestCase){
+        if (routeTestCase) {
           this.editTestCase(routeTestCase);
-        }else if (caseId) {
+        } else if (caseId) {
           this.$get('test/case/get/' + caseId, response => {
             let testCase = response.data;
             this.editTestCase(testCase);
@@ -494,7 +507,7 @@ export default {
       this.$get("/project/get/" + this.projectId, result => {
         let data = result.data;
         if (data) {
-          this.$store.commit('setCurrentProjectIsCustomNum',  data.customNum);
+          this.$store.commit('setCurrentProjectIsCustomNum', data.customNum);
         }
       });
     },
@@ -502,6 +515,20 @@ export default {
       this.initApiTableOpretion = "trashEnable";
       this.trashEnable = data;
     },
+    changeVersion(currentVersion) {
+      this.currentVersion = currentVersion || null;
+    },
+    checkout(testCase, item) {
+      Object.assign(item.testCaseInfo, testCase)
+      this.type = "copy";
+      this.$refs.testCaseEdit[0].initEdit(item.testCaseInfo);
+      this.$nextTick(() => {
+        let vh = this.$refs.testCaseEdit[0].$refs.versionHistory;
+        vh.getVersionOptionList(vh.handleVersionOptions);
+        vh.show = false;
+        vh.loading = false;
+      });
+    }
   }
 };
 </script>
@@ -526,6 +553,10 @@ export default {
   min-width: 100%;
   max-width: 100%;
   padding-right: 100%;
+}
+
+.version-select {
+  padding-left: 10px;
 }
 
 </style>

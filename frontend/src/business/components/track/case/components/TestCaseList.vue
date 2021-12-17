@@ -130,6 +130,18 @@
         </ms-table-column>
 
         <ms-table-column
+          :label="$t('project.version.name')"
+          :field="item"
+          :fields-width="fieldsWidth"
+          :filters="versionFilters"
+          min-width="100px"
+          prop="versionId">
+          <template v-slot:default="scope">
+            <span>{{ scope.row.versionName }}</span>
+          </template>
+        </ms-table-column>
+
+        <ms-table-column
           prop="nodePath"
           :field="item"
           :fields-width="fieldsWidth"
@@ -236,7 +248,7 @@ import {
 } from "@/common/js/tableUtils";
 import HeaderLabelOperate from "@/business/components/common/head/HeaderLabelOperate";
 import PlanStatusTableItem from "@/business/components/track/common/tableItems/plan/PlanStatusTableItem";
-import {getCurrentProjectID} from "@/common/js/utils";
+import {getCurrentProjectID, hasLicense} from "@/common/js/utils";
 import {getTestTemplate} from "@/network/custom-field-template";
 import {getProjectMember} from "@/network/user";
 import MsTable from "@/business/components/common/components/table/MsTable";
@@ -292,6 +304,7 @@ export default {
         components: TEST_CASE_CONFIGS,
         filters: {}
       },
+      versionFilters: [],
       graphData: {},
       priorityFilters: [
         {text: 'P0', value: 'P0'},
@@ -403,6 +416,7 @@ export default {
       type: Boolean,
       default: false,
     },
+    currentVersion: String,
   },
   computed: {
     projectId() {
@@ -430,6 +444,8 @@ export default {
     this.initTableData();
     let redirectParam = this.$route.query.dataSelectRange;
     this.checkRedirectEditPage(redirectParam);
+    // 切换tab之后版本查询
+    this.condition.versionId = this.currentVersion;
     if (this.trashEnable) {
       this.operators = this.trashOperators;
       this.batchButtons = this.trashButtons;
@@ -458,6 +474,7 @@ export default {
     }
     this.initTableData();
     this.condition.ids = null;
+    this.getVersionOptions();
   },
   watch: {
     selectNodeIds() {
@@ -487,7 +504,11 @@ export default {
         this.batchButtons = this.simpleButtons;
         this.condition.filters.status = [];
       }
-    }
+    },
+    currentVersion() {
+      this.condition.versionId = this.currentVersion;
+      this.initTableData();
+    },
   },
   methods: {
     getTemplateField() {
@@ -896,7 +917,16 @@ export default {
         this.$refs.testBatchMove.close();
         this.refresh();
       });
-    }
+    },
+    getVersionOptions() {
+      if (hasLicense()) {
+        this.$get('/project/version/get-project-versions/' + getCurrentProjectID(), response => {
+          this.versionFilters = response.data.map(u => {
+            return {text: u.name, value: u.id};
+          });
+        });
+      }
+    },
   }
 };
 </script>

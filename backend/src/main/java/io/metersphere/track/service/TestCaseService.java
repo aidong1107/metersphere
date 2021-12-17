@@ -24,6 +24,7 @@ import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.user.SessionUser;
 import io.metersphere.commons.utils.*;
 import io.metersphere.controller.request.OrderRequest;
+import io.metersphere.controller.request.ProjectVersionRequest;
 import io.metersphere.controller.request.ResetOrderRequest;
 import io.metersphere.controller.request.member.QueryMemberRequest;
 import io.metersphere.dto.*;
@@ -152,6 +153,8 @@ public class TestCaseService {
     private TestPlanService testPlanService;
     @Resource
     private MinderExtraNodeService minderExtraNodeService;
+    @Resource
+    private ProjectVersionService projectVersionService;
 
     private void setNode(TestCaseWithBLOBs testCase) {
         if (StringUtils.isEmpty(testCase.getNodeId()) || "default-module".equals(testCase.getNodeId())) {
@@ -183,6 +186,17 @@ public class TestCaseService {
         request.setCreateUser(SessionUtils.getUserId());
         this.setNode(request);
         request.setOrder(ServiceUtils.getNextOrder(request.getProjectId(), extTestCaseMapper::getLastOrder));
+        if(StringUtils.isAllBlank(request.getRefId(), request.getVersionId())){
+            //新创建测试用例，默认使用最新版本
+            request.setRefId(request.getId());
+            ProjectVersionRequest pvr = new ProjectVersionRequest();
+            pvr.setLatest(true);
+            List<ProjectVersionDTO> pvs = projectVersionService.getVersionList(pvr);
+            if(pvs.size() == 0){
+                MSException.throwException(Translator.get("no_version_exists"));
+            }
+            request.setVersionId(pvs.get(0).getId());
+        }
         testCaseMapper.insert(request);
         saveFollows(request.getId(), request.getFollows());
         return request;
@@ -245,6 +259,22 @@ public class TestCaseService {
     public int editTestCase(TestCaseWithBLOBs testCase) {
         checkTestCustomNum(testCase);
         testCase.setUpdateTime(System.currentTimeMillis());
+        // 更新数据
+        TestCaseExample example = new TestCaseExample();
+        example.createCriteria().andIdEqualTo(testCase.getId()).andVersionIdEqualTo(testCase.getVersionId());
+        if (testCaseMapper.updateByExampleSelective(testCase, example) == 0) {
+            // 插入新版本的数据
+            TestCaseWithBLOBs oldTestCase = testCaseMapper.selectByPrimaryKey(testCase.getId());
+            testCase.setId(UUID.randomUUID().toString());
+            testCase.setNum(oldTestCase.getNum());
+            testCase.setVersionId(testCase.getVersionId());
+            testCase.setCreateTime(System.currentTimeMillis());
+            testCase.setUpdateTime(System.currentTimeMillis());
+            testCase.setCreateUser(SessionUtils.getUserId());
+            testCase.setOrder(oldTestCase.getOrder());
+            testCase.setRefId(oldTestCase.getRefId());
+            testCaseMapper.insertSelective(testCase);
+        }
         return testCaseMapper.updateByPrimaryKeySelective(testCase);
     }
 
@@ -2121,5 +2151,35 @@ public class TestCaseService {
         example.createCriteria().andCaseIdEqualTo(caseId);
         List<TestCaseFollow> follows = testCaseFollowMapper.selectByExample(example);
         return follows.stream().map(TestCaseFollow::getFollowId).distinct().collect(Collectors.toList());
+    }
+
+    public List<TestCaseDTO> getTestCaseVersions(String caseId) {
+        TestCaseWithBLOBs testCase = testCaseMapper.selectByPrimaryKey(caseId);
+        if (testCase == null) {
+            return new ArrayList<>();
+        }
+        QueryTestCaseRequest request = new QueryTestCaseRequest();
+        request.setRefId(testCase.getRefId());
+        return this.listTestCase(request);
+    }
+
+    public TestCaseDTO getTestCaseByVersion(String refId, String version) {
+        QueryTestCaseRequest request = new QueryTestCaseRequest();
+        request.setRefId(refId);
+        request.setVersionId(version);
+        List<TestCaseDTO> testCaseList = this.listTestCase(request);
+        if (CollectionUtils.isEmpty(testCaseList)) {
+            return null;
+        }
+        return testCaseList.get(0);
+    }
+
+    public void deleteTestCaseByVersion(String refId, String version) {
+        TestCaseExample e = new TestCaseExample();
+        e.createCriteria().andRefIdEqualTo(refId).andVersionIdEqualTo(version);
+        List<TestCaseWithBLOBs> testCaseList = testCaseMapper.selectByExampleWithBLOBs(e);
+        if (CollectionUtils.isNotEmpty(testCaseList)) {
+            testCaseMapper.deleteByExample(e);
+        }
     }
 }
