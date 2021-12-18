@@ -5,18 +5,19 @@ import io.metersphere.reportstatistics.dto.HeadlessRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.remote.RemoteWebDriver;
+
+import java.net.URL;
 
 public class ChromeUtils {
-    private static final String DEFAULT_DRIVERPATH = "/Users/handsomesong/chromeDriver/chromedriver_mac64_m1/chromedriver";
+    private static final String DEFAULT_REMOTE_DRIVER_URL = "http://127.0.0.1:4444";
+
 
     private WebDriver genWebDriver(HeadlessRequest headlessRequest) {
-        String driverPath = headlessRequest.driverPath;
-        if (StringUtils.isEmpty(driverPath)) {
-            driverPath = DEFAULT_DRIVERPATH;
-        }
+        String driverUrl = DEFAULT_REMOTE_DRIVER_URL;
+
         //初始化一个chrome浏览器实例driver
         ChromeOptions options = new ChromeOptions();
         options.addArguments("headless");
@@ -30,10 +31,13 @@ public class ChromeUtils {
         options.addArguments("no-proxy-server");
         options.addArguments("disable-dev-shm-usage");
         options.addArguments("lang=zh_CN.UTF-8");
+
+        DesiredCapabilities capabilities = new DesiredCapabilities();
+        capabilities.setCapability(ChromeOptions.CAPABILITY, options);
+        capabilities.setCapability("browserName", "chrome");
         WebDriver driver = null;
         try {
-            System.setProperty(ChromeDriverService.CHROME_DRIVER_EXE_PROPERTY, driverPath);
-            driver = new ChromeDriver(options);
+            driver = new RemoteWebDriver(new URL(driverUrl),capabilities);
             driver.get(headlessRequest.url);
             driver.manage().window().fullscreen();
         }catch (Exception e){

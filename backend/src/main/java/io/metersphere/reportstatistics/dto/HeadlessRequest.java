@@ -7,5 +7,5 @@ import lombok.Setter;
 @Setter
 public class HeadlessRequest {
     public String url;
-    public String driverPath;
+    public String remoteDriverUrl;
 }
