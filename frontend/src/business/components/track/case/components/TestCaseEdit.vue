@@ -535,7 +535,7 @@ export default {
           initFuc(testCase);
         });
     },
-    initEdit(testCase) {
+    initEdit(testCase, callback) {
       if (window.history && window.history.pushState) {
         history.pushState(null, null, document.URL);
         window.addEventListener('popstate', this.close);
@@ -575,6 +575,9 @@ export default {
         this.getSelectOptions();
         parseCustomField(this.form, this.testCaseTemplate, this.customFieldForm, this.customFieldRules);
         this.reload();
+      }
+      if(callback){
+        callback();
       }
     },
     handlePre() {
@@ -924,6 +927,9 @@ export default {
           }
         }
       });
+    },
+    changeType(type) {
+      this.type = type;
     }
   }
 }

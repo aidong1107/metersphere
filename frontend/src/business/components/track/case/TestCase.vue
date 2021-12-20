@@ -520,13 +520,15 @@ export default {
     },
     checkout(testCase, item) {
       Object.assign(item.testCaseInfo, testCase)
-      this.type = "copy";
-      this.$refs.testCaseEdit[0].initEdit(item.testCaseInfo);
-      this.$nextTick(() => {
-        let vh = this.$refs.testCaseEdit[0].$refs.versionHistory;
-        vh.getVersionOptionList(vh.handleVersionOptions);
-        vh.show = false;
-        vh.loading = false;
+      //子组件先变更 copy 状态，再执行初始化操作
+      this.$refs.testCaseEdit[0].changeType("copy");
+      this.$refs.testCaseEdit[0].initEdit(item.testCaseInfo, () => {
+        this.$nextTick(() => {
+          let vh = this.$refs.testCaseEdit[0].$refs.versionHistory;
+          vh.getVersionOptionList(vh.handleVersionOptions);
+          vh.show = false;
+          vh.loading = false;
+        });
       });
     }
   }
