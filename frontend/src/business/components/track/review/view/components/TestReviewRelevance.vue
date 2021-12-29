@@ -34,12 +34,24 @@
                       ref="table">
 
               <el-table-column type="selection"/>
+
               <el-table-column
                 prop="name"
                 :label="$t('test_track.case.name')"
                 style="width: 100%">
                 <template v-slot:default="scope">
-                  {{scope.row.name}}
+                  {{ scope.row.name }}
+                </template>
+              </el-table-column>
+
+              <el-table-column
+                prop="versionName"
+                :label="$t('test_track.case.version')"
+                column-key="versionId"
+                :filters="versionFilters"
+                style="width: 100%">
+                <template v-slot:default="scope">
+                  {{ scope.row.versionName }}
                 </template>
               </el-table-column>
 
@@ -108,7 +120,7 @@ import ReviewStatus from "@/business/components/track/case/components/ReviewStat
 import elTableInfiniteScroll from 'el-table-infinite-scroll';
 import SelectMenu from "../../../common/SelectMenu";
 import {_filter} from "@/common/js/tableUtils";
-import {getCurrentProjectID, getCurrentUserId, getCurrentWorkspaceId} from "@/common/js/utils";
+import {getCurrentProjectID, getCurrentUserId, getCurrentWorkspaceId, hasLicense} from "@/common/js/utils";
 
 
 export default {
@@ -138,6 +150,7 @@ export default {
         dialogFormVisible: false,
         isCheckAll: false,
         testReviews: [],
+        versionFilters: [],
         selectIds: new Set(),
         treeNodes: [],
         selectNodeIds: [],
@@ -188,6 +201,9 @@ export default {
         this.condition.projectId = this.projectId;
         this.getProjectNode();
       }
+    },
+    mounted() {
+      this.getVersionOptions();
     },
     updated() {
       this.toggleSelection(this.testReviews);
@@ -364,7 +380,16 @@ export default {
           });
 
         this.selectNodeIds = [];
-      }
+      },
+      getVersionOptions() {
+        if (hasLicense()) {
+          this.$get('/project/version/get-project-versions/' + getCurrentProjectID(), response => {
+            this.versionFilters = response.data.map(u => {
+              return {text: u.name, value: u.id};
+            });
+          });
+        }
+      },
     }
   }
 </script>

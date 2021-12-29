@@ -576,7 +576,7 @@ export default {
         parseCustomField(this.form, this.testCaseTemplate, this.customFieldForm, this.customFieldRules);
         this.reload();
       }
-      if(callback){
+      if (callback) {
         callback();
       }
     },
@@ -706,9 +706,13 @@ export default {
             this.close();
           }
           this.form.id = response.data.id;
+          this.currentTestCaseInfo.id = response.data.id;
 
           if (callback) {
             callback(this);
+          }
+          if (hasLicense()) {
+            this.getVersionHistory();
           }
           // 保存用例后刷新附件
         });
@@ -890,6 +894,7 @@ export default {
     getVersionHistory() {
       this.$get('/test/case/versions/' + this.currentTestCaseInfo.id, response => {
         this.versionData = response.data;
+        this.$refs.versionHistory.loading = false;
       });
     },
     compare(row) {
@@ -903,14 +908,14 @@ export default {
         this.$get('test/case/get/' + testCase.id, response => {
           let testCase = response.data;
           this.$emit("checkout", testCase);
+          this.$refs.versionHistory.loading = false;
         });
       }
     },
     create(row) {
       // 创建新版本
       this.form.versionId = row.id;
-      this.saveCase(this.getVersionHistory());
-      this.$refs.versionHistory.loading = false;
+      this.saveCase();
     },
     del(row) {
       let that = this;
@@ -922,7 +927,7 @@ export default {
               this.$success(this.$t('commons.delete_success'));
               this.getVersionHistory();
             });
-          }else{
+          } else {
             that.$refs.versionHistory.loading = false;
           }
         }

@@ -170,7 +170,7 @@ public class TestCaseController {
     }
 
     @PostMapping("/reviews/case/{goPage}/{pageSize}")
-    public Pager<List<TestCase>> getReviewCase(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryTestCaseRequest request) {
+    public Pager<List<TestCaseDTO>> getReviewCase(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryTestCaseRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         return PageUtils.setPageInfo(page, testCaseService.getReviewCase(request));
     }
