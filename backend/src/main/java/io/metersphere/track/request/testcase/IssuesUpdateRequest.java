@@ -1,6 +1,7 @@
 package io.metersphere.track.request.testcase;
 
 import io.metersphere.base.domain.IssuesWithBLOBs;
+import io.metersphere.track.dto.IssueAttachmentDTO;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -30,4 +31,6 @@ public class IssuesUpdateRequest extends IssuesWithBLOBs {
     private List<String> follows;
 
     private boolean withoutTestCaseIssue; // 不更新用例和缺陷的关联关系
+
+    private List<IssueAttachmentDTO> attachmentList;
 }

@@ -23,10 +23,7 @@ import io.metersphere.service.CustomFieldTemplateService;
 import io.metersphere.service.IntegrationService;
 import io.metersphere.service.IssueTemplateService;
 import io.metersphere.service.ProjectService;
-import io.metersphere.track.dto.PlanReportIssueDTO;
-import io.metersphere.track.dto.TestCaseReportStatusResultDTO;
-import io.metersphere.track.dto.TestPlanFunctionResultReportDTO;
-import io.metersphere.track.dto.TestPlanSimpleReportDTO;
+import io.metersphere.track.dto.*;
 import io.metersphere.track.issue.*;
 import io.metersphere.track.issue.domain.PlatformUser;
 import io.metersphere.track.issue.domain.zentao.ZentaoBuild;
@@ -35,12 +32,19 @@ import io.metersphere.track.request.testcase.IssuesRequest;
 import io.metersphere.track.request.testcase.IssuesUpdateRequest;
 import io.metersphere.track.request.testcase.TestCaseBatchRequest;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -77,6 +81,8 @@ public class IssuesService {
     private TestPlanTestCaseService testPlanTestCaseService;
     @Resource
     private IssueFollowMapper issueFollowMapper;
+    @Resource
+    private PlatformDataMapper platformDataMapper;
 
     public void testAuth(String workspaceId, String platform) {
         IssuesRequest issuesRequest = new IssuesRequest();
@@ -99,6 +105,51 @@ public class IssuesService {
         return issues;
     }
 
+    public IssuesWithBLOBs addIssuesWithFiles(IssuesUpdateRequest issuesRequest, List<MultipartFile> files) {
+        List<AbstractIssuePlatform> platformList = getAddPlatforms(issuesRequest);
+        IssuesWithBLOBs issues = null;
+        for (AbstractIssuePlatform platform : platformList) {
+            // FIXME: 2022/1/13
+            issues = platform.addIssue(issuesRequest);
+//            issues = new IssuesWithBLOBs();
+//            issues.setId("test1");
+//            issues.setPlatformId("UIQISI-18029");
+            //存在附件，上传Jira
+            if (files.size() > 0 && platform instanceof JiraPlatform) {
+                JiraPlatform jiraPlatform = (JiraPlatform) platform;
+                jiraUploadAttachment(files, issues.getPlatformId(), jiraPlatform);
+                jiraPlatform.syncPlatFormData(issuesRequest.getPlatformId());
+            }
+        }
+        issuesRequest.getTestCaseIds().forEach(l -> {
+            testCaseIssueService.updateIssuesCount(l);
+        });
+        saveFollows(issuesRequest.getId(), issuesRequest.getFollows());
+        return null;
+    }
+
+    private void jiraUploadAttachment
+            (List<MultipartFile> files, String issuesPlatformId, JiraPlatform jiraPlatform) {
+        for (MultipartFile multipartFile : files) {
+            try {
+                final String tmpPath = FileUtils.getTempDirectoryPath() + File.separator + UUID.randomUUID();
+                final boolean mkdirs = new File(tmpPath).mkdirs();
+                if (!mkdirs) {
+                    LogUtil.error("mkdirs error,tmpPath:{}", tmpPath);
+                    throw new RuntimeException("mkdirs error");
+                }
+                final File tmpFile = new File(tmpPath + multipartFile.getOriginalFilename());
+                multipartFile.transferTo(tmpFile);
+                jiraPlatform.uploadAttachment(issuesPlatformId, tmpFile);
+                if (tmpFile.exists()) {
+                    tmpFile.delete();
+                }
+            } catch (IOException ioException) {
+                throw new RuntimeException(ioException);
+            }
+        }
+    }
+
 
     public void updateIssues(IssuesUpdateRequest issuesRequest) {
         issuesRequest.getId();
@@ -108,6 +159,39 @@ public class IssuesService {
         });
         //saveFollows(issuesRequest.getId(), issuesRequest.getFollows());
         // todo 缺陷更新事件？
+    }
+
+    public void updateIssuesWithFiles(IssuesUpdateRequest issuesRequest, List<MultipartFile> files) {
+        List<AbstractIssuePlatform> platformList = getUpdatePlatforms(issuesRequest);
+        platformList.forEach(platform -> {
+            platform.updateIssue(issuesRequest);
+            if (platform instanceof JiraPlatform) {
+                JiraPlatform jiraPlatform = (JiraPlatform) platform;
+                PlatformData platformData = platformDataMapper.selectByPlatformId(issuesRequest.getPlatformId());
+                if (platformData != null) {
+                    final JSONObject issueFields = JSONObject.parseObject(platformData.getPlatformData());
+                    final JSONArray attachmentArray = issueFields.getJSONArray("attachment");
+                    if (attachmentArray.size() > 0 && attachmentArray.size() != issuesRequest.getAttachmentList().size()) {
+                        //附件列表数量不一致，存在删除附
+                        attachmentArray.forEach(o -> {
+                            final JSONObject jsonObject = (JSONObject) o;
+                            final String filename = jsonObject.getString("filename");
+                            if (issuesRequest.getAttachmentList().stream()
+                                    .noneMatch(item -> filename.equals(item.getName()))) {
+                                jiraPlatform.deleteAttachment(jsonObject.getString("id"));
+                            }
+                        });
+                    }
+                }
+
+                if (files != null && files.size() > 0) {
+                    jiraUploadAttachment(files, issuesRequest.getPlatformId(), jiraPlatform);
+                }
+
+                jiraPlatform.syncPlatFormData(issuesRequest.getPlatformId());
+
+            }
+        });
     }
 
     public void saveFollows(String issueId, List<String> follows) {
@@ -362,9 +446,47 @@ public class IssuesService {
                 ZentaoPlatform platform = (ZentaoPlatform) IssueFactory.createPlatform(item.getPlatform(), request);
                 platform.getZentaoAssignedAndBuilds(item);
             }
+
+            //Jira附件处理
+            List<IssueAttachmentDTO> attachmentDTOList = getIssueAttachmentDTOS(item);
+            item.setAttachmentList(attachmentDTOList);
         });
         return issues;
     }
+
+    private List<IssueAttachmentDTO> getIssueAttachmentDTOS(IssuesDao item) {
+        List<IssueAttachmentDTO> attachmentDTOList = new ArrayList<>();
+        final PlatformData platformData = platformDataMapper.selectByPlatformId(item.getPlatformId());
+        if (platformData == null || platformData.getPlatformData() == null) {
+            return attachmentDTOList;
+        }
+        final JSONObject jsonObject = JSONObject.parseObject(platformData.getPlatformData());
+        if (!jsonObject.containsKey("attachment")) {
+            return attachmentDTOList;
+        }
+        final JSONArray attachment = jsonObject.getJSONArray("attachment");
+        attachment.forEach(o -> {
+            JSONObject attachmentObj = (JSONObject) o;
+            IssueAttachmentDTO attachmentDTO = new IssueAttachmentDTO();
+            attachmentDTO.setId(attachmentObj.getString("id"));
+            attachmentDTO.setName(attachmentObj.getString("filename"));
+            if (attachmentObj.getString("mimeType") != null) {
+                final String[] mimeTypes = attachmentObj.getString("mimeType").split("/");
+                attachmentDTO.setType(mimeTypes[mimeTypes.length - 1]);
+            }
+            attachmentDTO.setSize(attachmentObj.getLong("size"));
+            attachmentDTO.setUrl(attachmentObj.getString("content"));
+            if (StringUtils.isNotEmpty(attachmentObj.getString("created"))) {
+                final long createdTime = DateUtils.getTimeFromISO8601Timestamp(attachmentObj.getString("created")).getTime();
+                attachmentDTO.setUpdateTime(createdTime);
+            }
+
+            attachmentDTOList.add(attachmentDTO);
+
+        });
+        return attachmentDTOList;
+    }
+
 
     public Map<String, List<IssuesDao>> getIssueMap(List<IssuesDao> issues) {
         Map<String, List<IssuesDao>> issueMap = new HashMap<>();

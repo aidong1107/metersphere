@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.IssuesMapper;
+import io.metersphere.base.mapper.PlatformDataMapper;
 import io.metersphere.base.mapper.ProjectMapper;
 import io.metersphere.base.mapper.TestCaseIssuesMapper;
 import io.metersphere.base.mapper.ext.ExtIssuesMapper;
@@ -54,6 +55,7 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
     protected ProjectService projectService;
     protected TestCaseService testCaseService;
     protected IssuesMapper issuesMapper;
+    protected PlatformDataMapper platformDataMapper;
     protected ExtIssuesMapper extIssuesMapper;
     protected ResourceService resourceService;
     protected RestTemplate restTemplateIgnoreSSL;
@@ -110,6 +112,7 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
         this.extIssuesMapper = CommonBeanFactory.getBean(ExtIssuesMapper.class);
         this.resourceService = CommonBeanFactory.getBean(ResourceService.class);
         this.testCaseIssueService = CommonBeanFactory.getBean(TestCaseIssueService.class);
+        this.platformDataMapper = CommonBeanFactory.getBean(PlatformDataMapper.class);
         this.restTemplateIgnoreSSL = restTemplate;
     }
 

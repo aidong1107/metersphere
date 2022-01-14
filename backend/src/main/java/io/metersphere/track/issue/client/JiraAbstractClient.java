@@ -133,6 +133,18 @@ public abstract class JiraAbstractClient extends BaseClient {
         System.out.println(response);
     }
 
+    /**
+     * 删除附件
+     * /rest/api/2/attachment/{id}
+     *
+     * @param attachmentId 附件id
+     */
+    public void deleteAttachment(String attachmentId) {
+        HttpHeaders authHeader = getAuthHeader();
+        final HttpEntity<String> requestEntity = new HttpEntity<>(authHeader);
+//        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(new LinkedMultiValueMap<>(), authHeader);
+        restTemplate.exchange(getBaseUrl() + "/attachment/" + attachmentId, HttpMethod.DELETE, requestEntity, String.class);
+    }
     public void auth() {
         try {
             restTemplate.exchange(getBaseUrl() + "/myself", HttpMethod.GET, getAuthHttpEntity(), String.class);

@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import io.metersphere.base.domain.IssuesDao;
 import io.metersphere.base.domain.IssuesWithBLOBs;
+import io.metersphere.base.domain.PlatformData;
 import io.metersphere.base.domain.Project;
 import io.metersphere.commons.constants.CustomFieldType;
 import io.metersphere.commons.constants.IssuesManagePlatform;
@@ -92,8 +93,7 @@ public class JiraPlatform extends AbstractIssuePlatform {
     private String getStatus(JSONObject fields) {
         JSONObject statusObj = (JSONObject) fields.get("status");
         if (statusObj != null) {
-            JSONObject statusCategory = (JSONObject) statusObj.get("statusCategory");
-            return statusCategory.getString("name");
+            return statusObj.getString("name");
         }
         return "";
     }
@@ -166,7 +166,22 @@ public class JiraPlatform extends AbstractIssuePlatform {
         // 用例与第三方缺陷平台中的缺陷关联
         handleTestCaseIssues(issuesRequest);
 
+        final PlatformData platformData = new PlatformData();
+        platformData.setId(UUID.randomUUID().toString());
+        platformData.setRecordId(res.getId());
+        platformData.setPlatform(IssuesManagePlatform.Jira.name());
+        platformData.setPlatformId(res.getPlatformId());
+        platformData.setPlatformData(issues.getFields().toJSONString());
+        platformDataMapper.insert(platformData);
         return res;
+    }
+
+    public void uploadAttachment(String issueKey, File file) {
+        jiraClientV2.uploadAttachment(issueKey, file);
+    }
+
+    public void deleteAttachment(String attachmentId) {
+        jiraClientV2.deleteAttachment(attachmentId);
     }
 
     private JSONObject buildUpdateParam(IssuesUpdateRequest issuesRequest, String issuetypeStr) {
@@ -223,10 +238,10 @@ public class JiraPlatform extends AbstractIssuePlatform {
                                 param.put("id", item.getValue());
                             }
                             fields.put(fieldName, param);
-                        } else if (StringUtils.equalsAny(item.getType(),  "multipleSelect", "checkbox", "multipleMember")) {
+                        } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
                             JSONArray attrs = new JSONArray();
                             if (item.getValue() != null) {
-                                JSONArray values = (JSONArray)item.getValue();
+                                JSONArray values = (JSONArray) item.getValue();
                                 values.forEach(v -> {
                                     JSONObject param = new JSONObject();
                                     param.put("id", v);
@@ -234,7 +249,7 @@ public class JiraPlatform extends AbstractIssuePlatform {
                                 });
                             }
                             fields.put(fieldName, attrs);
-                        } else if (StringUtils.equalsAny(item.getType(),  "cascadingSelect")) {
+                        } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
                             if (item.getValue() != null) {
                                 JSONObject attr = new JSONObject();
                                 if (item.getValue() instanceof JSONArray) {
@@ -301,13 +316,16 @@ public class JiraPlatform extends AbstractIssuePlatform {
         issues.forEach(item -> {
             try {
                 IssuesWithBLOBs issuesWithBLOBs = issuesMapper.selectByPrimaryKey(item.getId());
-                getUpdateIssue(item, jiraClientV2.getIssues(item.getPlatformId()));
+                final JiraIssue jiraIssue = jiraClientV2.getIssues(item.getPlatformId());
+                getUpdateIssue(item, jiraIssue);
                 String desc = htmlDesc2MsDesc(item.getDescription());
                 // 保留之前上传的图片
                 String images = getImages(issuesWithBLOBs.getDescription());
                 item.setDescription(desc + "\n" + images);
 
                 issuesMapper.updateByPrimaryKeySelective(item);
+                //更新Jira原始Field
+                platformDataMapper.updateDataByPlatformId(item.getPlatformId(), jiraIssue.getFields().toJSONString());
             } catch (HttpClientErrorException e) {
                 if (e.getRawStatusCode() == 404) {
                     // 标记成删除
@@ -525,5 +543,10 @@ public class JiraPlatform extends AbstractIssuePlatform {
             options.add(jsonObject);
         });
         return options.toJSONString();
+    }
+
+    public void syncPlatFormData(String platformId){
+        final JiraIssue issues = jiraClientV2.getIssues(platformId);
+        platformDataMapper.updateDataByPlatformId(platformId, issues.getFields().toJSONString());
     }
 }

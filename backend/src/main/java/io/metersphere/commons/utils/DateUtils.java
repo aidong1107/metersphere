@@ -1,5 +1,9 @@
 package io.metersphere.commons.utils;
 
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -10,6 +14,7 @@ import java.util.Map;
 public class DateUtils {
     public static final String DATE_PATTERM = "yyyy-MM-dd";
     public static final String TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
+    public static final String ISO_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 
 
     public static Date getDate(String dateString) throws Exception {
@@ -124,5 +129,11 @@ public class DateUtils {
      */
     public static Date getDayStartTime(Date time) throws Exception {
         return getDate(getDateString(time));
+    }
+
+    public static Date getTimeFromISO8601Timestamp(String isoTime) {
+        DateTimeFormatter dtf1 = DateTimeFormat.forPattern(ISO_PATTERN);
+        DateTime dt= dtf1.parseDateTime(isoTime);
+        return dt.toDate();
     }
 }

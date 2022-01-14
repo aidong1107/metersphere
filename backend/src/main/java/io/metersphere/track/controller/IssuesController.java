@@ -21,6 +21,7 @@ import io.metersphere.track.request.testcase.IssuesUpdateRequest;
 import io.metersphere.track.service.IssuesService;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -55,6 +56,16 @@ public class IssuesController {
         return issuesService.addIssues(issuesRequest);
     }
 
+    @PostMapping(value = "/addWithFiles", consumes = {"multipart/form-data"})
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_CREATE)
+    @MsAuditLog(module = "track_bug", type = OperLogConstants.CREATE, content = "#msClass.getLogDetails(#issuesRequest)", msClass = IssuesService.class)
+    @SendNotice(taskType = NoticeConstants.TaskType.DEFECT_TASK, target = "#issuesRequest",
+            event = NoticeConstants.Event.CREATE, mailTemplate = "track/IssuesCreate", subject = "缺陷通知")
+    public IssuesWithBLOBs addIssuesWithFiles(@RequestPart("request") IssuesUpdateRequest issuesRequest,
+                                              @RequestPart(value = "file", required = false) List<MultipartFile> files) {
+        return issuesService.addIssuesWithFiles(issuesRequest, files);
+    }
+
     @PostMapping("/update")
     @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     @MsAuditLog(module = "track_bug", type = OperLogConstants.UPDATE, beforeEvent = "#msClass.getLogDetails(#issuesRequest.id)", content = "#msClass.getLogDetails(#issuesRequest.id)", msClass = IssuesService.class)
@@ -62,6 +73,16 @@ public class IssuesController {
             event = NoticeConstants.Event.UPDATE, mailTemplate = "track/IssuesUpdate", subject = "缺陷通知")
     public void updateIssues(@RequestBody IssuesUpdateRequest issuesRequest) {
         issuesService.updateIssues(issuesRequest);
+    }
+
+    @PostMapping(value = "/updateWithFiles", consumes = {"multipart/form-data"})
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
+    @MsAuditLog(module = "track_bug", type = OperLogConstants.UPDATE, beforeEvent = "#msClass.getLogDetails(#issuesRequest.id)", content = "#msClass.getLogDetails(#issuesRequest.id)", msClass = IssuesService.class)
+    @SendNotice(taskType = NoticeConstants.TaskType.DEFECT_TASK, target = "#issuesRequest",
+            event = NoticeConstants.Event.UPDATE, mailTemplate = "track/IssuesUpdate", subject = "缺陷通知")
+    public void updateIssues(@RequestPart("request") IssuesUpdateRequest issuesRequest,
+                             @RequestPart(value = "file", required = false) List<MultipartFile> files) {
+        issuesService.updateIssuesWithFiles(issuesRequest,files);
     }
 
     @GetMapping("/get/case/{id}")
@@ -152,8 +173,8 @@ public class IssuesController {
     }
 
     @PostMapping("/up/follows/{issueId}")
-    public void saveFollows(@PathVariable String issueId,@RequestBody List<String> follows) {
-        issuesService.saveFollows(issueId,follows);
+    public void saveFollows(@PathVariable String issueId, @RequestBody List<String> follows) {
+        issuesService.saveFollows(issueId, follows);
     }
 
     @GetMapping("/thirdpart/template/{projectId}")
