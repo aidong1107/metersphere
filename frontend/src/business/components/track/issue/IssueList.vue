@@ -67,10 +67,12 @@
           <ms-table-column
                   :field="item"
                   :fields-width="fieldsWidth"
-                  sortable
                   min-width="110"
                   :label="$t('test_track.issue.result') "
                   prop="solveResult">
+            <template v-slot="scope">
+              <span>{{ scope.row.platformStatus === "New"||scope.row.platformStatus === "处理中"||scope.row.platformStatus === "Reopen"?"未解决":"完成" }}</span>
+            </template>
           </ms-table-column>
           
           <ms-table-column

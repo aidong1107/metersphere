@@ -204,9 +204,6 @@ export default {
       }
     }
   },
-  updated(){
-    console.log(JSON.stringify(this.tableData))
-  },
   methods: {
     rowClick(row){
 				this.radioRequId=row.id
