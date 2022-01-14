@@ -16,6 +16,12 @@ export default {
     data: Object,
     prop: String,
     disabled: Boolean,
+    imagelinkSwitch:{
+      type: Boolean,
+      default() {
+        return true;
+      }
+    },
     autoReview: {
       type: Boolean,
       default() {
@@ -38,7 +44,7 @@ export default {
           ol: true, // 有序列表
           ul: true, // 无序列表
           link: true, // 链接
-          imagelink: true, // 图片链接
+          imagelink: this.imagelinkSwitch, // 图片链接
           code: true, // code
           table: true, // 表格
           fullscreen: true, // 全屏编辑

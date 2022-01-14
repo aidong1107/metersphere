@@ -46,6 +46,7 @@ export default {
     },
     open(items) {
       items = JSON.parse(JSON.stringify(items));
+      console.log(JSON.stringify(items))
       items.forEach(it => {
         if (it.isCustom) {
           // i18n
@@ -68,6 +69,7 @@ export default {
       this.visible = true;
     },
     saveHeader() {
+      // console.log(JSON.stringify(this.selectedFields))
       saveCustomTableHeader(this.type, this.selectedFields);
       this.$success(this.$t("commons.save_success"));
       this.$emit('reload');

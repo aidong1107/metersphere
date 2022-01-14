@@ -1,6 +1,6 @@
 <template>
-  <el-main v-loading="result.loading" class="container" :style="isPlan ? '' : 'height: calc(100vh - 62px)'">
-    <el-scrollbar>
+  <el-main class="container" :style="isPlan ? '' : 'height: calc(100vh - 62px)'">
+    <el-scrollbar v-loading="result.loading">
       <el-form :model="form" :rules="rules" label-position="right" label-width="80px" ref="form">
 
         <el-form-item v-if="!enableThirdPartTemplate" :label="$t('commons.title')" prop="title">
@@ -26,7 +26,7 @@
           <custom-filed-form-item :form="customFieldForm" :form-label-width="formLabelWidth" :issue-template="issueTemplate"/>
         </el-form>
 
-        <form-rich-text-item v-if="!enableThirdPartTemplate" :title="$t('custom_field.issue_content')" :data="form" prop="description"/>
+        <form-rich-text-item v-if="!enableThirdPartTemplate" :title="$t('custom_field.issue_content')" :data="form" prop="description" :imagelinkSwitch="false"/>
 
         <el-row v-if="!enableThirdPartTemplate" class="custom-field-row">
           <el-col :span="8" v-if="hasTapdId">
@@ -67,14 +67,42 @@
         </el-form-item>
 
 <!--        <form-rich-text-item :title="$t('commons.remark')" :data="form" prop="remark"/>-->
-
+        <el-row style="margin-top: 10px;margin-bottom: 1px">
+          <el-col :span="20" :offset="1">
+            <span>{{ $t('test_track.case.attachment') }}：</span>
+            <div style="display:inline-block">
+            <el-upload
+              action=""
+              :show-file-list="false"
+              :before-upload="beforeUpload"
+              :http-request="handleUpload"
+              :on-exceed="handleExceed"
+              multiple
+              :limit="8"
+              :disabled="false"
+              :file-list="fileList">
+              <el-button icon="el-icon-plus" :disabled="false" size="mini"></el-button>
+              <!-- <span slot="tip" class="el-upload__tip"> {{ $t('test_track.case.upload_tip') }} </span> -->
+            </el-upload>
+            </div>
+          </el-col>
+        </el-row>
+        <el-row>
+        <el-col :span="19" :offset="2">
+          <test-case-attachment :table-data="tableData"
+                                :read-only="false"
+                                :is-delete="true"
+                                :isbugManage="true"
+                                @handleDelete="handleDelete"/>
+        </el-col>
+      </el-row>
         <el-row style="margin-top: 10px" v-if="type!=='add'">
           <el-col :span="20" :offset="1">{{ $t('test_track.review.comment') }}:
             <el-button icon="el-icon-plus" type="mini" @click="openComment"></el-button>
           </el-col>
         </el-row>
         <el-row>
-          <el-col :span="20" :offset="1">
+          <el-col :span="20" :offset="1" v-if="type!=='add'">
 
             <review-comment-item v-for="(comment,index) in comments"
                                  :key="index"
@@ -120,6 +148,8 @@ import CustomFiledFormItem from "@/business/components/common/components/form/Cu
 import MsMarkDownText from "@/business/components/track/case/components/MsMarkDownText";
 import IssueComment from "@/business/components/track/issue/IssueComment";
 import ReviewCommentItem from "@/business/components/track/review/commom/ReviewCommentItem";
+import TestCaseAttachment from "@/business/components/track/case/components/TestCaseAttachment";
+
 
 export default {
   name: "IssueEditDetail",
@@ -135,7 +165,8 @@ export default {
     TemplateComponentEditHeader,
     MsMarkDownText,
     IssueComment,
-    ReviewCommentItem
+    ReviewCommentItem,
+    TestCaseAttachment
   },
   data() {
     return {
@@ -145,6 +176,9 @@ export default {
         loading: false
       },
       relateFields: [],
+      tableData: [],
+      uploadList: [],
+      fileList: [],
       showFollow:false,
       formLabelWidth: "150px",
       issueTemplate: {},
@@ -236,6 +270,55 @@ export default {
     },
   },
   methods: {
+    handleExceed() {
+      this.$error(this.$t('load_test.file_size_limit'));
+    },
+    handleUpload(uploadResources) {
+      this.uploadList.push(uploadResources.file);
+    },
+    fileValidator(file) {
+      /// todo: 是否需要对文件内容和大小做限制
+      return file.size > 0;
+    },
+    beforeUpload(file) {
+      if (!this.fileValidator(file)) {
+        /// todo: 显示错误信息
+        return false;
+      }
+
+      if (this.tableData.filter(f => f.name === file.name).length > 0) {
+        this.$error(this.$t('load_test.delete_file') + ', name: ' + file.name);
+        return false;
+      }
+
+      let type = file.name.substring(file.name.lastIndexOf(".") + 1);
+
+      this.tableData.push({
+        name: file.name,
+        size: file.size + ' Bytes', /// todo: 按照大小显示Byte、KB、MB等
+        type: type,
+        updateTime: new Date().getTime(),
+      });
+      return true;
+    },
+    handleDelete(file, index) {
+      this.$alert(this.$t('load_test.delete_file_confirm') + file.name + "？", '', {
+        confirmButtonText: this.$t('commons.confirm'),
+        callback: (action) => {
+          if (action === 'confirm') {
+            this._handleDelete(file, index);
+          }
+        }
+      });
+    },
+    _handleDelete(file, index) {
+      this.fileList.splice(index, 1);
+      this.tableData.splice(index, 1);
+      let i = this.uploadList.findIndex(upLoadFile => upLoadFile.name === file.name);
+      if (i > -1) {
+        this.uploadList.splice(i, 1);
+      }
+    },
     open(data, type) {
       this.result.loading = true;
       this.type = type;
@@ -303,15 +386,25 @@ export default {
       this.testCaseContainIds = new Set();
       if (data) {
         Object.assign(this.form, data);
+        if(Array.isArray(data.attachmentList)&&data.attachmentList.length>0){
+          this.fileList = JSON.parse(JSON.stringify(data.attachmentList));
+          this.tableData = JSON.parse(JSON.stringify(data.attachmentList));
+          this.tableData.map(f => {
+            f.size = f.size + ' Bytes';
+          });
+        }else{
+          this.fileList = [];
+          this.tableData = [];
+        }
         if (!(data.options instanceof Array)) {
           this.form.options = data.options ? JSON.parse(data.options) : [];
         }
         if (data.id) {
           this.issueId = data.id
-          this.url = 'issues/update';
+          this.url = 'issues/updateWithFiles';
         } else {
           //copy
-          this.url = 'issues/add';
+          this.url = 'issues/addWithFiles';
           if (!this.form.creator) {
             this.form.creator = getCurrentUserId();
           }
@@ -322,13 +415,16 @@ export default {
           title: this.issueTemplate.title,
           description: this.issueTemplate.content
         };
-        this.url = 'issues/add';
+        this.fileList = [];
+        this.tableData = [];
+        this.url = 'issues/addWithFiles';
         if (!this.form.creator) {
           this.form.creator = getCurrentUserId();
         }
       }
       this.customFieldForm = parseCustomField(this.form, this.issueTemplate, this.customFieldRules);
       this.comments = [];
+      this.uploadList = [];
       this.$nextTick(() => {
         if (this.$refs.testCaseIssueList) {
           this.$refs.testCaseIssueList.initTableData();
@@ -377,7 +473,23 @@ export default {
     _save() {
       let param = this.buildPram();
       this.parseOldFields(param);
-      this.result = this.$post(this.url, param, (response) => {
+      if(this.url === "issues/updateWithFiles"){
+        param.attachmentList = JSON.parse(JSON.stringify(this.fileList));
+      }
+      let formData = new FormData();
+      if (this.uploadList.length>0) {
+        this.uploadList.forEach(f => {
+          formData.append("file", f);
+        });
+      }
+      let requestJson = JSON.stringify(param);
+      formData.append('request', new Blob([requestJson], {
+        type: "application/json"
+      }));
+      // console.log(formData)
+      // console.log(JSON.stringify(param));
+      // console.log(JSON.stringify(this.fileList))
+      this.result = this.$post(this.url, formData, (response) => {
         this.$emit('close');
         this.$success(this.$t('commons.save_success'));
         this.$emit('refresh', response.data);
@@ -406,7 +518,7 @@ export default {
             break;
           }
         }
-        if(this.url === "issues/update"){
+        if(this.url === "issues/updateWithFiles"){
           this.$post("issues/up/follows/"+this.issueId, this.form.follows,() => {
             this.$success(this.$t('commons.cancel_follow_success'));
           });
@@ -418,7 +530,7 @@ export default {
           this.form.follows = [];
         }
         this.form.follows.push(this.currentUser().id)
-        if(this.url === "issues/update"){
+        if(this.url === "issues/updateWithFiles"){
           this.$post("issues/up/follows/"+this.issueId, this.form.follows,() => {
             this.$success(this.$t('commons.follow_success'));
           });

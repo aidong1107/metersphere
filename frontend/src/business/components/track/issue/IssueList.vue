@@ -69,6 +69,27 @@
                   :fields-width="fieldsWidth"
                   sortable
                   min-width="110"
+                  :label="$t('test_track.issue.result') "
+                  prop="solveResult">
+          </ms-table-column>
+          
+          <ms-table-column
+                  :field="item"
+                  :fields-width="fieldsWidth"
+                  sortable
+                  min-width="110"
+                  :label="$t('test_track.issue.jira_num') "
+                  prop="platformId">
+            <template v-slot="scope">
+              <span @click="toJira(scope.row.platformId)" class="platformId">{{ scope.row.platformId }}</span>
+            </template>
+          </ms-table-column>
+
+          <ms-table-column
+                  :field="item"
+                  :fields-width="fieldsWidth"
+                  sortable
+                  min-width="110"
                   :label="$t('test_track.issue.platform_status') "
                   prop="platformStatus">
             <template v-slot="scope">
@@ -256,6 +277,9 @@ export default {
     this.getMaintainerOptions();
   },
   methods: {
+    toJira(id){
+      window.open(`http://yldevpm.faw.com/browse/${id}`)
+    },
     tableDoLayout() {
       if (this.$refs.table) this.$refs.table.doLayout();
     },
@@ -337,5 +361,11 @@ export default {
 
 .el-table {
   cursor: pointer;
+}
+.platformId{
+  cursor:pointer;
+}
+.platformId:hover{
+  color:#409EFF;
 }
 </style>

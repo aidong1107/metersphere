@@ -795,7 +795,7 @@ export default {
       let requestJson = JSON.stringify(param, function (key, value) {
         return key === "file" ? undefined : value
       });
-
+      console.log(requestJson)
       formData.append('request', new Blob([requestJson], {
         type: "application/json"
       }));

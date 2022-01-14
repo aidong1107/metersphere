@@ -10,19 +10,22 @@
     </el-tab-pane>
 
     <el-tab-pane :label="$t('test_track.related_requirements')" name="demand">
-      <el-col :span="7">
-        <el-form-item :label="$t('test_track.related_requirements')" :label-width="labelWidth"
+      <el-col :span="24">
+        <el-form-item :label="$t('test_track.related_requirements')+':'" :label-width="labelWidth"
                       prop="demandId">
-
-          <el-cascader v-model="demandValue" :show-all-levels="false" :options="demandOptions" clearable/>
+          <el-tooltip class="item" effect="dark" :content="demandTool" placement="top">
+            <span>{{Array.isArray(demandValue)&&demandValue.length>0?demandValue[0]:' 暂无'}}</span>
+          </el-tooltip>
+          <!-- <el-cascader v-model="demandValue" :show-all-levels="false" :options="demandOptions" clearable/> -->
+          <el-button size="small" style="margin-left:10px" type="primary" @click="dialogClick">选择需求</el-button>
         </el-form-item>
       </el-col>
-      <el-col :span="7">
+      <!-- <el-col :span="7">
         <el-form-item :label="$t('test_track.case.demand_name_id')" :label-width="labelWidth" prop="demandName"
                       v-if="form.demandId=='other'">
           <el-input :disabled="readOnly" v-model="form.demandName"></el-input>
         </el-form-item>
-      </el-col>
+      </el-col> -->
     </el-tab-pane>
 
     <el-tab-pane :label="$t('test_track.case.relate_issue')" name="bug">
@@ -68,6 +71,58 @@
         </el-col>
       </el-row>
     </el-tab-pane>
+    <el-dialog
+      :close-on-click-modal="false"
+      :visible="dialogVisible"
+      :before-close="dialogCloseHandler"
+      title="选择需求"
+      width="700px"
+    >
+      <el-row>
+        <!-- <el-select size="small" v-model="selectedRequestValue" filterable placeholder="请选择">
+          <el-option
+            v-for="item in requestList"
+            :key="item.id"
+            :label="item.id+' '+item.name"
+            :value="item.id">
+          </el-option>
+        </el-select> -->
+        <el-input size="small" style="width: 185px;" class="filter-item"  v-model="queryRequest.id" placeholder="请输入ID" clearable @keyup.enter.native="searchRequest"/>
+        <el-input size="small" style="width: 185px;" class="filter-item"  v-model="queryRequest.name" placeholder="请输入名称" clearable @keyup.enter.native="searchRequest"/>
+        <el-button class="operation-button" size="small" type="primary" icon="el-icon-search" @click="searchRequest">
+          搜索
+        </el-button>
+        <el-button class="operation-button" size="small" type="warning" icon="el-icon-refresh-left" @click="resetRequest">
+          重置
+        </el-button>
+      </el-row>
+      <el-table
+        border
+        row-key="id"
+        :data="requestList"
+        highlight-current-row
+        height="350"
+        @row-click="rowClick"
+      >
+        <el-table-column width="30">
+          <template slot-scope="scope">
+            <el-radio :label="scope.row.id" v-model="radioRequId"></el-radio>
+          </template>
+        </el-table-column>
+        <el-table-column type="index" label="序号" :index="getIndex" width="50"/>
+        <el-table-column prop="id" label="需求ID" show-overflow-tooltip width="120"/>
+        <el-table-column prop="name" label="需求名称" show-overflow-tooltip />
+        <el-table-column label="操作" width="80">
+          <template slot-scope="scope">
+            <span style="cursor:pointer;color:#409EFF;" @click="toJira(scope.row.id)">转到JIRA</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="text" @click="dialogCloseHandler">取消</el-button>
+        <el-button :disabled="!radioRequId" size="small" type="primary" @click="confirmRequest">确定</el-button>
+      </div>
+    </el-dialog>
   </el-tabs>
 </template>
 
@@ -93,7 +148,12 @@ export default {
   props: ['form', 'labelWidth', 'caseId', 'readOnly', 'projectId', 'isTestPlan', 'planId'],
   data() {
     return {
+      radioRequId:null,
+      requestList:[],
+      requestListAll:[],
       result: {},
+      queryRequest:{id:null,name:null},
+      // selectedRequestValue:null,
       tabActiveName: "remark",
       uploadList: [],
       fileList: [],
@@ -101,6 +161,9 @@ export default {
       demandOptions: [],
       relationshipCount: 0,
       demandValue: [],
+      selectedRequestRow:{},
+      dialogVisible:false,
+      demandTool:"暂无",
       //sysList:this.sysList,//一级选择框的数据
       props: {
         multiple: true,
@@ -141,7 +204,54 @@ export default {
       }
     }
   },
+  updated(){
+    console.log(JSON.stringify(this.tableData))
+  },
   methods: {
+    rowClick(row){
+				this.radioRequId=row.id
+        this.selectedRequestRow = row
+		},
+    searchRequest(){
+      if(!this.queryRequest.id&&!this.queryRequest.name){return false;}
+      else if(this.queryRequest.id&&!this.queryRequest.name){
+        this.requestList = this.requestListAll.filter((item)=>{
+          return item.id.indexOf(this.queryRequest.id) > -1
+        })
+      }else if(!this.queryRequest.id&&this.queryRequest.name){
+        this.requestList = this.requestListAll.filter((item)=>{
+          return item.name.indexOf(this.queryRequest.name) > -1
+        })
+      }else{
+        this.requestList = this.requestListAll.filter((item)=>{
+          return (item.id.indexOf(this.queryRequest.id) > -1)&&(item.name.indexOf(this.queryRequest.name) > -1)
+        })
+      }
+    },
+    resetRequest(){
+      this.selectedRequestRow = null;
+      this.queryRequest = {id:null,name:null};
+      this.requestList = this.requestListAll.concat();
+      this.radioRequId=null;
+    },
+    toJira(id){
+      window.open(`http://yldevpm.faw.com/browse/${id}`)
+    },
+    getIndex(index) {
+      return index+1;
+    },
+    confirmRequest(){
+      this.demandValue = [this.radioRequId];
+      this.demandTool = this.selectedRequestRow.name;
+      this.dialogCloseHandler();
+    },
+    dialogClick(){
+      this.dialogVisible = true;
+    },
+    dialogCloseHandler(){
+      this.dialogVisible = false;
+      this.resetRequest();
+    },
     updateRemark(text) {
       this.form.remark = text;
     },
@@ -174,7 +284,6 @@ export default {
         type: type.toUpperCase(),
         updateTime: new Date().getTime(),
       });
-
       return true;
     },
     handleUpload(uploadResources) {
@@ -268,6 +377,8 @@ export default {
           this.demandOptions = [];
           if (response.data.data && response.data.data.length > 0) {
             this.buildDemandCascaderOptions(response.data.data, this.demandOptions, []);
+            this.requestList = response.data.data;
+            this.requestListAll = response.data.data;
           }
           this.demandOptions.unshift({value: 'other', label: 'Other: ' + this.$t('test_track.case.other'), platform: 'Other'});
           if (this.form.demandId === 'other') {
@@ -293,6 +404,8 @@ export default {
         pathArray.push(item.id);
         if (item.id === this.form.demandId) {
           this.demandValue = [...pathArray]; // 回显级联选项
+          this.demandTool = item.name;
+          // this.radioRequId = pathArray[0]
         }
         if (item.children && item.children.length > 0) {
           option.children = [];
@@ -300,6 +413,7 @@ export default {
         }
         pathArray.pop();
       });
+      
     }
   }
 };
@@ -318,5 +432,12 @@ export default {
 .el-cascader >>> .el-input {
   cursor: pointer;
   width: 250px;
+}
+.filter-item{
+  margin-right: 10px;
+  margin-bottom: 10px;
+}
+.operation-button{
+  margin-bottom: 10px;
 }
 </style>

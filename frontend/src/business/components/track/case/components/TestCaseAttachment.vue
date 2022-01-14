@@ -26,10 +26,10 @@
             :label="$t('commons.operating')">
             <template v-slot:default="scope">
               <el-button @click="preview(scope.row)" :disabled="!scope.row.id" type="primary"
-                         v-if="isPreview(scope.row)"
+                         v-if="isbugManage?true:isPreview(scope.row)"
                          icon="el-icon-view"
                          size="mini" circle/>
-              <el-button @click="handleDownload(scope.row)"  type="primary" :disabled="!scope.row.id"
+              <el-button @click="handleDownload(scope.row)" v-if="!isbugManage"  type="primary" :disabled="!scope.row.id"
                          icon="el-icon-download"
                          size="mini" circle/>
               <el-button :disabled="readOnly || !isDelete" @click="handleDelete(scope.row, scope.$index)" type="danger"
@@ -62,6 +62,10 @@ export default {
       type: Boolean,
       default: false
     },
+    isbugManage: {
+      type: Boolean,
+      default: false
+    },
   },
   data() {
     return {
@@ -70,7 +74,11 @@ export default {
   },
   methods: {
     preview(row) {
-      this.$refs.testCaseFile.open(row);
+      if(this.isbugManage){
+        window.open(row.url);
+      }else{
+        this.$refs.testCaseFile.open(row);
+      }
     },
     isPreview(row) {
       const fileType = row.type;

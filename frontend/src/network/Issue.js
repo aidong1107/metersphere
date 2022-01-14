@@ -132,6 +132,7 @@ export function getIssuePartTemplateWithProject(callback) {
               callback(template, currentProject);
         });
     } else {
+      console.log('woca')
       getIssueTemplate()
         .then((template) => {
           if (callback)
