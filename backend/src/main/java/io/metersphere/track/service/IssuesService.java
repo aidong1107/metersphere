@@ -109,13 +109,9 @@ public class IssuesService {
         List<AbstractIssuePlatform> platformList = getAddPlatforms(issuesRequest);
         IssuesWithBLOBs issues = null;
         for (AbstractIssuePlatform platform : platformList) {
-            // FIXME: 2022/1/13
             issues = platform.addIssue(issuesRequest);
-//            issues = new IssuesWithBLOBs();
-//            issues.setId("test1");
-//            issues.setPlatformId("UIQISI-18029");
             //存在附件，上传Jira
-            if (files.size() > 0 && platform instanceof JiraPlatform) {
+            if (platform instanceof JiraPlatform && files!=null && files.size() > 0) {
                 JiraPlatform jiraPlatform = (JiraPlatform) platform;
                 jiraUploadAttachment(files, issues.getPlatformId(), jiraPlatform);
                 jiraPlatform.syncPlatFormData(issuesRequest.getPlatformId());
